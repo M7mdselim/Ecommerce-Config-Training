@@ -4,30 +4,44 @@ server:
 spring:
   application:
     name: api-gateway
+
+  # Redis Reactive configuration for Token Bucket Rate Limiting
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  # Spring Cloud Gateway routing configurations
   cloud:
     gateway:
-      server:
-        webflux:
-          routes:
-            - id: product-service
-              uri: lb://PRODUCT-SERVICE
-              predicates:
-                - Path=/api/products/**
-              filters:
-                - StripPrefix=0
-                - AddResponseHeader=X-Platform, microservices-pro
+      routes:
+        - id: product-service
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/products/**
+          filters:
+            # Rewrites client request path from /api/products/* to backend /api/v1/products/*
+            - RewritePath=/api/products(?<segment>.*), /api/v1/products$\{segment}
+            - AddResponseHeader=X-Platform, microservices-pro
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+        - id: order-service
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/orders/**
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,gateway
+        # ADMIN-only route — SecurityConfig enforces ROLE_ADMIN; customers get 403
+        - id: order-service-admin
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/orders/admin/**
+
+        - id: inventory-service
+          uri: lb://INVENTORY-SERVICE
+          predicates:
+            - Path=/api/v1/inventory/**

@@ -1,0 +1,24 @@
+# =========================================================================
+# Production Environment Profile (SPRING_PROFILES_ACTIVE=prod)
+# Production Datasources, Logging, and Distributed Infrastructure
+# =========================================================================
+
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    com.microservice.pro: INFO
+    com.microservices.pro: INFO
+
+management:
+  tracing:
+    sampling:
+      probability: 0.1 # Sample 10% in production for high throughput performance
